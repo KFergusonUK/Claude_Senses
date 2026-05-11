@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Senses</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7c6bff;
+    --accent2: #ff6b9d;
+    --accent3: #6bffd8;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --danger: #ff4d6d;
+    --success: #4dffb4;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    gap: 12px;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .status-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .status-pill.active .dot { background: var(--success); }
+  .status-pill.recording .dot { background: var(--danger); animation: pulse 1s infinite; }
+
+  .api-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .api-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  /* ── LEFT: CAMERA ── */
+  .cam-panel {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .cam-wrap {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #050508;
+  }
+
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  #video.live { opacity: 1; }
+
+  canvas { display: none; }
+
+  .cam-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  /* Corner brackets */
+  .cam-overlay::before, .cam-overlay::after {
+    content: '';
+    position: absolute;
+    width: 32px; height: 32px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.6;
+  }
+  .cam-overlay::before { top: 16px; left: 16px; border-width: 2px 0 0 2px; }
+  .cam-overlay::after  { top: 16px; right: 16px; border-width: 2px 2px 0 0; }
+
+  .corner-br, .corner-bl {
+    position: absolute;
+    width: 32px; height: 32px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .corner-br { bottom: 16px; right: 16px; border-width: 0 2px 2px 0; }
+  .corner-bl { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; }
+
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    animation: scan 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 0.5; }
+    90% { opacity: 0.5; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .no-cam-msg {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+  .no-cam-msg .icon { font-size: 2.5rem; opacity: 0.3; }
+
+  .cam-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.danger.active { background: var(--danger); border-color: var(--danger); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .interval-select {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    appearance: none;
+    outline: none;
+  }
+  .interval-select:focus { border-color: var(--accent); }
+
+  .label-sm {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .snap-indicator {
+    font-size: 0.68rem;
+    color: var(--accent3);
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .snap-indicator.flash { opacity: 1; }
+
+  /* ── RIGHT: CHAT ── */
+  .chat-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .chat-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .chat-header-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+  }
+  .clear-btn {
+    font-size: 0.65rem;
+    color: var(--muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    transition: color 0.2s;
+  }
+  .clear-btn:hover { color: var(--danger); }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    animation: msgIn 0.25s ease-out;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-meta {
+    font-size: 0.62rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .msg-meta .tag {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+  }
+  .tag-vision { background: rgba(124,107,255,0.15); color: var(--accent); }
+  .tag-voice  { background: rgba(255,107,157,0.15); color: var(--accent2); }
+  .tag-text   { background: rgba(107,255,216,0.15); color: var(--accent3); }
+  .tag-auto   { background: rgba(255,200,100,0.12); color: #ffca64; }
+
+  .msg-bubble {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    border: 1px solid var(--border);
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg.user .msg-bubble {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: var(--border);
+  }
+  .msg.assistant .msg-bubble {
+    background: rgba(124,107,255,0.07);
+    color: var(--text);
+    border-color: rgba(124,107,255,0.2);
+  }
+  .msg.system .msg-bubble {
+    background: transparent;
+    color: var(--muted);
+    border-color: transparent;
+    font-style: italic;
+    font-size: 0.72rem;
+    padding: 4px 0;
+  }
+
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    border: 1px solid rgba(124,107,255,0.15);
+    background: rgba(124,107,255,0.04);
+  }
+  .thinking-dots span {
+    display: inline-block;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%,80%,100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── INPUT ── */
+  .input-area {
+    border-top: 1px solid var(--border);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  #userInput {
+    flex: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 9px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+    min-height: 38px;
+    max-height: 100px;
+  }
+  #userInput:focus { border-color: var(--accent); }
+  #userInput::placeholder { color: var(--muted); }
+
+  .send-btn {
+    padding: 9px 16px;
+    border-radius: 7px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: #9585ff; }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .input-hints {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .hint-chip {
+    font-size: 0.63rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: none;
+    font-family: 'DM Mono', monospace;
+  }
+  .hint-chip:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  /* ── MIC VOICE INDICATOR ── */
+  .mic-waves {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 16px;
+  }
+  .mic-waves span {
+    display: block;
+    width: 2px;
+    background: var(--accent2);
+    border-radius: 1px;
+    animation: wave 0.6s ease-in-out infinite alternate;
+    min-height: 3px;
+  }
+  .mic-waves span:nth-child(1) { animation-delay: 0s; height: 4px; }
+  .mic-waves span:nth-child(2) { animation-delay: 0.1s; height: 10px; }
+  .mic-waves span:nth-child(3) { animation-delay: 0.2s; height: 14px; }
+  .mic-waves span:nth-child(4) { animation-delay: 0.1s; height: 10px; }
+  .mic-waves span:nth-child(5) { animation-delay: 0s; height: 4px; }
+  @keyframes wave {
+    from { transform: scaleY(0.4); }
+    to   { transform: scaleY(1); }
+  }
+
+  /* ── API KEY MODAL ── */
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    max-width: 440px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    animation: modalIn 0.3s ease-out;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    line-height: 1.2;
+  }
+  .modal-sub {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .modal-sub a { color: var(--accent); text-decoration: none; }
+  .modal-sub a:hover { text-decoration: underline; }
+  .modal-input {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    padding: 11px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-input::placeholder { color: var(--muted); }
+  .modal-save {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    padding: 11px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: 500;
+  }
+  .modal-save:hover { background: #9585ff; }
+  .modal-note {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── VOICE STATUS ── */
+  .voice-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.68rem;
+    color: var(--muted);
+    min-height: 20px;
+  }
+  #interimText {
+    color: var(--accent2);
+    font-style: italic;
+    opacity: 0.8;
+  }
+
+  /* ── SYSTEM PROMPT ── */
+  .sys-area {
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .sys-toggle {
+    font-size: 0.65rem;
+    color: var(--muted);
+    padding: 6px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border: none;
+    background: none;
+    font-family: 'DM Mono', monospace;
+    width: 100%;
+    text-align: left;
+    transition: color 0.2s;
+  }
+  .sys-toggle:hover { color: var(--accent3); }
+  #sysPromptArea {
+    display: none;
+    padding: 8px 12px 12px;
+  }
+  #sysPrompt {
+    width: 100%;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+    min-height: 60px;
+    max-height: 120px;
+  }
+  #sysPrompt:focus { border-color: var(--accent3); }
+</style>
+</head>
+<body>
+
+<!-- ── API KEY MODAL ── -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-title">Claude Senses 👁️🎤</div>
+    <div class="modal-sub">
+      Real-time vision & voice streaming with Claude.<br><br>
+      Enter your Anthropic API key to get started. It stays in your browser only — never stored on any server.<br><br>
+      Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+    </div>
+    <input class="modal-input" type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off">
+    <button class="modal-save" onclick="saveKey()">Start Session →</button>
+    <div class="modal-note">🔒 Key stored in localStorage · never leaves your browser · you pay Anthropic directly</div>
+  </div>
+</div>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Claude Senses
+  </div>
+  <div class="status-bar">
+    <div class="status-pill" id="camPill">
+      <div class="dot"></div>
+      <span>camera</span>
+    </div>
+    <div class="status-pill" id="micPill">
+      <div class="dot"></div>
+      <span>voice</span>
+    </div>
+    <div class="status-pill" id="autoPill">
+      <div class="dot"></div>
+      <span>auto</span>
+    </div>
+  </div>
+  <button class="api-btn" onclick="showModal()">⚙ API Key</button>
+</header>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <!-- LEFT: CAMERA -->
+  <div class="cam-panel">
+    <div class="cam-wrap" id="camWrap">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="canvas"></canvas>
+      <div class="cam-overlay">
+        <div class="scan-line" id="scanLine"></div>
+      </div>
+      <div class="corner-br"></div>
+      <div class="corner-bl"></div>
+      <div class="no-cam-msg" id="noCamMsg">
+        <div class="icon">📷</div>
+        <div>Click <strong>Start Camera</strong> below<br>to begin visual feed</div>
+      </div>
+    </div>
+
+    <div class="cam-controls">
+      <button class="btn" id="camBtn" onclick="toggleCamera()">▶ Start Camera</button>
+      <button class="btn" id="snapBtn" onclick="snapAndSend()" disabled>📸 Snap & Ask</button>
+      <button class="btn" id="micBtn" onclick="toggleMic()">🎤 Voice</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:4px;">
+        <span class="label-sm">auto every</span>
+        <select class="interval-select" id="intervalSelect">
+          <option value="0">off</option>
+          <option value="5">5s</option>
+          <option value="10" selected>10s</option>
+          <option value="20">20s</option>
+          <option value="30">30s</option>
+          <option value="60">60s</option>
+        </select>
+      </div>
+      <button class="btn" id="autoBtn" onclick="toggleAuto()">⚡ Auto</button>
+      <span class="snap-indicator" id="snapIndicator">⚡ captured</span>
+    </div>
+  </div>
+
+  <!-- RIGHT: CHAT -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-header-title">Conversation</div>
+      <button class="clear-btn" onclick="clearChat()">clear</button>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg system">
+        <div class="msg-bubble">Welcome. Start your camera, then snap a frame or ask me anything. Enable auto-capture to have me comment on the scene periodically.</div>
+      </div>
+    </div>
+
+    <!-- Voice status -->
+    <div class="voice-status" style="padding: 0 16px 4px;" id="voiceStatus">
+      <span id="interimText"></span>
+    </div>
+
+    <!-- Input -->
+    <div class="input-area">
+      <div class="input-row">
+        <textarea id="userInput" placeholder="Ask Claude about what it sees…" rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendText()">Send</button>
+      </div>
+      <div class="input-hints">
+        <button class="hint-chip" onclick="setHint(this)">What do you see?</button>
+        <button class="hint-chip" onclick="setHint(this)">Describe the scene</button>
+        <button class="hint-chip" onclick="setHint(this)">Any text visible?</button>
+        <button class="hint-chip" onclick="setHint(this)">What's happening?</button>
+        <button class="hint-chip" onclick="setHint(this)">Count the objects</button>
+      </div>
+    </div>
+
+    <!-- System prompt -->
+    <div class="sys-area">
+      <button class="sys-toggle" onclick="toggleSys()">▸ system prompt</button>
+      <div id="sysPromptArea">
+        <textarea id="sysPrompt" rows="3">You are Claude Senses — a perceptive, concise AI with real-time vision and voice input. When given an image, describe what you observe naturally and helpfully. Be direct and specific. Keep responses brief unless asked for detail.</textarea>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+let apiKey = localStorage.getItem('claude_senses_key') || '';
+let stream = null;
+let recognition = null;
+let isListening = false;
+let autoInterval = null;
+let isRequesting = false;
+let conversationHistory = [];
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const messages = document.getElementById('messages');
+const userInput = document.getElementById('userInput');
+
+// ── INIT ──
+window.onload = () => {
+  if (apiKey) document.getElementById('modalBg').style.display = 'none';
+  setupSpeech();
+};
+
+// ── API KEY ──
+function saveKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val.startsWith('sk-')) {
+    document.getElementById('apiKeyInput').style.borderColor = 'var(--danger)';
+    return;
+  }
+  apiKey = val;
+  localStorage.setItem('claude_senses_key', val);
+  document.getElementById('modalBg').style.display = 'none';
+}
+function showModal() {
+  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('modalBg').style.display = 'flex';
+}
+
+// ── CAMERA ──
+async function toggleCamera() {
+  if (stream) {
+    stopCamera();
+  } else {
+    await startCamera();
+  }
+}
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+      audio: false
+    });
+    video.srcObject = stream;
+    video.classList.add('live');
+    document.getElementById('noCamMsg').style.display = 'none';
+    document.getElementById('camBtn').textContent = '■ Stop Camera';
+    document.getElementById('camBtn').classList.add('active');
+    document.getElementById('snapBtn').disabled = false;
+    setPill('camPill', 'active');
+    addSystemMsg('Camera started. Ready to capture frames.');
+  } catch(e) {
+    addSystemMsg('Camera access denied. Please allow camera permissions.');
+  }
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  video.srcObject = null;
+  video.classList.remove('live');
+  document.getElementById('noCamMsg').style.display = 'flex';
+  document.getElementById('camBtn').textContent = '▶ Start Camera';
+  document.getElementById('camBtn').classList.remove('active');
+  document.getElementById('snapBtn').disabled = true;
+  setPill('camPill', '');
+  stopAuto();
+}
+
+// ── CAPTURE FRAME ──
+function captureFrame(quality = 0.7) {
+  if (!stream) return null;
+  const w = video.videoWidth || 640;
+  const h = video.videoHeight || 480;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', quality).split(',')[1];
+}
+
+// ── SNAP & SEND ──
+async function snapAndSend(autoPrompt = null) {
+  if (!apiKey) { showModal(); return; }
+  if (isRequesting) return;
+
+  const frame = captureFrame();
+  const text = autoPrompt || userInput.value.trim() || 'What do you see in this image? Describe it briefly.';
+
+  if (!frame && !text) return;
+
+  flashSnap();
+  if (!autoPrompt) userInput.value = '';
+  autoResize(userInput);
+
+  // Add user message
+  addMessage('user', text, frame ? 'vision' : 'text', frame);
+
+  await callClaude(text, frame);
+}
+
+async function sendText() {
+  if (!apiKey) { showModal(); return; }
+  const text = userInput.value.trim();
+  if (!text || isRequesting) return;
+  userInput.value = '';
+  autoResize(userInput);
+
+  const frame = stream ? captureFrame() : null;
+  addMessage('user', text, frame ? 'vision' : 'text', frame);
+  await callClaude(text, frame);
+}
+
+// ── CLAUDE API ──
+async function callClaude(text, imageB64 = null) {
+  isRequesting = true;
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('snapBtn').disabled = true;
+
+  const thinkingEl = addThinking();
+
+  // Build message content
+  const content = [];
+  if (imageB64) {
+    content.push({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/jpeg', data: imageB64 }
+    });
+  }
+  content.push({ type: 'text', text });
+
+  // Add to conversation history
+  conversationHistory.push({ role: 'user', content });
+
+  const sysPrompt = document.getElementById('sysPrompt').value.trim();
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: sysPrompt,
+        messages: conversationHistory
+      })
+    });
+
+    const data = await resp.json();
+
+    if (data.error) {
+      thinkingEl.remove();
+      addSystemMsg(`Error: ${data.error.message}`);
+    } else {
+      const reply = data.content.map(b => b.text || '').join('');
+      thinkingEl.remove();
+      addMessage('assistant', reply);
+      conversationHistory.push({ role: 'assistant', content: [{ type: 'text', text: reply }] });
+      // Trim history to last 10 turns to avoid context overflow
+      if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+    }
+  } catch(e) {
+    thinkingEl.remove();
+    addSystemMsg('Network error. Check your API key and internet connection.');
+    console.error(e);
+  }
+
+  isRequesting = false;
+  document.getElementById('sendBtn').disabled = false;
+  if (stream) document.getElementById('snapBtn').disabled = false;
+}
+
+// ── AUTO CAPTURE ──
+function toggleAuto() {
+  if (autoInterval) {
+    stopAuto();
+  } else {
+    startAuto();
+  }
+}
+
+function startAuto() {
+  if (!stream) { addSystemMsg('Start camera first.'); return; }
+  const sec = parseInt(document.getElementById('intervalSelect').value);
+  if (!sec) { addSystemMsg('Choose an interval first.'); return; }
+  autoInterval = setInterval(() => {
+    if (!isRequesting) snapAndSend('What do you see? Give a brief, natural observation.');
+  }, sec * 1000);
+  document.getElementById('autoBtn').classList.add('active');
+  document.getElementById('autoBtn').textContent = '⚡ Auto ON';
+  setPill('autoPill', 'active');
+  addSystemMsg(`Auto-capture every ${sec}s enabled.`);
+}
+
+function stopAuto() {
+  clearInterval(autoInterval);
+  autoInterval = null;
+  document.getElementById('autoBtn').classList.remove('active');
+  document.getElementById('autoBtn').textContent = '⚡ Auto';
+  setPill('autoPill', '');
+}
+
+// ── VOICE ──
+function setupSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    document.getElementById('micBtn').disabled = true;
+    document.getElementById('micBtn').title = 'Speech recognition not supported in this browser';
+    return;
+  }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    document.getElementById('interimText').textContent = interim;
+    if (final.trim()) {
+      document.getElementById('interimText').textContent = '';
+      const frame = stream ? captureFrame() : null;
+      addMessage('user', final.trim(), frame ? 'voice' : 'voice', frame);
+      callClaude(final.trim(), frame);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error !== 'no-speech') addSystemMsg(`Voice error: ${e.error}`);
+  };
+  recognition.onend = () => {
+    if (isListening) recognition.start(); // keep alive
+  };
+}
+
+function toggleMic() {
+  if (!recognition) return;
+  if (isListening) {
+    isListening = false;
+    recognition.stop();
+    document.getElementById('micBtn').textContent = '🎤 Voice';
+    document.getElementById('micBtn').classList.remove('active', 'danger');
+    document.getElementById('interimText').textContent = '';
+    setPill('micPill', '');
+    addSystemMsg('Voice input stopped.');
+  } else {
+    isListening = true;
+    recognition.start();
+    document.getElementById('micBtn').innerHTML = `<div class="mic-waves"><span></span><span></span><span></span><span></span><span></span></div> Listening…`;
+    document.getElementById('micBtn').classList.add('active', 'danger');
+    setPill('micPill', 'recording');
+    addSystemMsg('Listening… speak naturally. I can see the camera too.');
+  }
+}
+
+// ── UI HELPERS ──
+function addMessage(role, text, type = 'text', imageB64 = null) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+
+  const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const tagClass = type === 'vision' ? 'tag-vision' : type === 'voice' ? 'tag-voice' : type === 'auto' ? 'tag-auto' : 'tag-text';
+  const tagLabel = type === 'vision' ? '📷 vision' : type === 'voice' ? '🎤 voice' : type === 'auto' ? '⚡ auto' : '✏ text';
+
+  meta.innerHTML = `<span>${role === 'assistant' ? 'Claude' : 'You'}</span><span class="tag ${tagClass}">${tagLabel}</span><span>${time}</span>`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.textContent = text;
+
+  div.appendChild(meta);
+  div.appendChild(bubble);
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+function addSystemMsg(text) {
+  const div = document.createElement('div');
+  div.className = 'msg system';
+  div.innerHTML = `<div class="msg-bubble">${text}</div>`;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function addThinking() {
+  const div = document.createElement('div');
+  div.className = 'msg assistant';
+  div.innerHTML = `
+    <div class="msg-meta"><span>Claude</span></div>
+    <div class="thinking">
+      <div class="thinking-dots"><span></span><span></span><span></span></div>
+      thinking…
+    </div>`;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+function clearChat() {
+  messages.innerHTML = '<div class="msg system"><div class="msg-bubble">Conversation cleared.</div></div>';
+  conversationHistory = [];
+}
+
+function flashSnap() {
+  const el = document.getElementById('snapIndicator');
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 800);
+}
+
+function setPill(id, state) {
+  const el = document.getElementById(id);
+  el.className = 'status-pill' + (state ? ' ' + state : '');
+}
+
+function setHint(btn) {
+  userInput.value = btn.textContent;
+  userInput.focus();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function toggleSys() {
+  const area = document.getElementById('sysPromptArea');
+  const btn = document.querySelector('.sys-toggle');
+  if (area.style.display === 'block') {
+    area.style.display = 'none';
+    btn.textContent = '▸ system prompt';
+  } else {
+    area.style.display = 'block';
+    btn.textContent = '▾ system prompt';
+  }
+}
+</script>
+</body>
+</html>
