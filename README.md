@@ -33,7 +33,7 @@ Claude Senses gives Claude real-time eyes and ears through your webcam and micro
 
 ### 2. Open the app
 
-👉 **[Open Claude Senses](https://yourusername.github.io/claude-senses)** *(replace with your GitHub Pages URL)*
+👉 **[Open Claude Senses](https://kfergusonuk.github.io/Claude_Senses/)**
 
 Or download `index.html` and open it directly in Chrome.
 
